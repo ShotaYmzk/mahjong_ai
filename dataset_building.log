@@ -1,0 +1,49 @@
+2025-10-26 11:41:28,958 - __main__ - INFO - ================================================================================
+2025-10-26 11:41:28,958 - __main__ - INFO - 包括的データセット構築スクリプト
+2025-10-26 11:41:28,958 - __main__ - INFO - ================================================================================
+2025-10-26 11:41:28,959 - __main__ - INFO - XMLディレクトリ: /home/ubuntu/Documents/tenhou_xml_2023
+2025-10-26 11:41:28,959 - __main__ - INFO - 出力ディレクトリ: data/processed_demo
+2025-10-26 11:41:28,959 - __main__ - INFO - 最大ゲーム数: 10000
+2025-10-26 11:41:28,959 - __main__ - INFO - ツモ履歴長: 8
+2025-10-26 11:41:28,959 - __main__ - INFO - 捨て牌履歴長: 32
+2025-10-26 11:41:28,959 - __main__ - INFO - 分割比率: train=0.8, val=0.1, test=0.1
+2025-10-26 11:41:28,959 - __main__ - INFO - ================================================================================
+2025-10-26 11:41:29,370 - __main__ - INFO - ✅ XMLファイルを発見: 194369 ファイル
+2025-10-26 11:41:29,370 - __main__ - INFO - 特徴量次元数: 2099
+2025-10-26 11:41:29,370 - __main__ - INFO -   基本特徴量: 340
+2025-10-26 11:41:29,370 - __main__ - INFO -   ツモ履歴: 272 (8 × 34)
+2025-10-26 11:41:29,370 - __main__ - INFO -   捨て牌履歴: 1248 (32 × 39)
+2025-10-26 11:41:29,370 - __main__ - INFO -   メタ特徴量: 31
+2025-10-26 11:41:29,370 - __main__ - INFO -   待ち・向聴数: 38
+2025-10-26 11:41:29,370 - __main__ - INFO -   捨て牌メタ: 170
+2025-10-26 11:41:29,370 - __main__ - INFO - ================================================================================
+2025-10-26 11:41:29,370 - preprocessing.game_state_tracker - WARNING - Shanten calculator not available, disabling shanten calculation
+2025-10-26 11:41:29,370 - preprocessing.feature_encoder_v2 - INFO - Feature encoder initialized with total dimension: 2099
+2025-10-26 11:41:29,370 - preprocessing.feature_encoder_v2 - INFO -   Basic features: 340
+2025-10-26 11:41:29,370 - preprocessing.feature_encoder_v2 - INFO -   Draw sequence: 272
+2025-10-26 11:41:29,370 - preprocessing.feature_encoder_v2 - INFO -   Discard sequence: 1248
+2025-10-26 11:41:29,370 - preprocessing.feature_encoder_v2 - INFO -   Meta features: 31
+2025-10-26 11:41:29,370 - preprocessing.feature_encoder_v2 - INFO -   Wait features: 38
+2025-10-26 11:41:29,370 - preprocessing.feature_encoder_v2 - INFO -   Discard meta: 170
+2025-10-26 11:41:29,372 - preprocessing.dataset_builder_v2 - INFO - Dataset builder initialized
+2025-10-26 11:41:29,372 - preprocessing.dataset_builder_v2 - INFO -   XML dir: /home/ubuntu/Documents/tenhou_xml_2023
+2025-10-26 11:41:29,372 - preprocessing.dataset_builder_v2 - INFO -   Output dir: data/processed_demo
+2025-10-26 11:41:29,372 - preprocessing.dataset_builder_v2 - INFO -   Feature dim: 2099
+2025-10-26 11:41:29,372 - preprocessing.dataset_builder_v2 - INFO -   Config: {'draw_history_length': 8, 'discard_history_length': 32, 'enable_shanten_calc': True, 'enable_danger_estimation': True, 'random_seed': 42, 'train_ratio': 0.8, 'val_ratio': 0.1, 'test_ratio': 0.1, 'chunk_size': 1000, 'num_workers': 1, 'validate': True}
+2025-10-26 11:41:29,372 - __main__ - INFO - データセット構築を開始します...
+2025-10-26 11:41:29,372 - preprocessing.dataset_builder_v2 - INFO - ================================================================================
+2025-10-26 11:41:29,372 - preprocessing.dataset_builder_v2 - INFO - Building Complete Dataset
+2025-10-26 11:41:29,372 - preprocessing.dataset_builder_v2 - INFO - ================================================================================
+2025-10-26 11:41:29,372 - preprocessing.dataset_builder_v2 - INFO - Step 1: Parsing XML files...
+2025-10-26 11:41:50,113 - preprocessing.enhanced_parser - INFO - Parsed 10000 games from /home/ubuntu/Documents/tenhou_xml_2023
+2025-10-26 11:41:50,114 - preprocessing.dataset_builder_v2 - INFO - Parsed 10000 games
+2025-10-26 11:41:50,114 - preprocessing.dataset_builder_v2 - INFO - Step 2: Validating parsed games...
+2025-10-26 11:41:56,676 - preprocessing.dataset_builder_v2 - INFO - Validation Report:
+  Passed: True
+  Total Checks: 35278840
+  Errors: 0
+  Warnings: 0
+  Infos: 0
+2025-10-26 11:41:56,676 - preprocessing.dataset_builder_v2 - INFO - Step 3: Extracting game states...
+2025-10-26 11:49:46,027 - preprocessing.dataset_builder_v2 - INFO - Extracted 4778053 decision points
+2025-10-26 11:49:46,029 - preprocessing.dataset_builder_v2 - INFO - Step 4: Encoding features...

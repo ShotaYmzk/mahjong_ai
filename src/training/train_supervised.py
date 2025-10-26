@@ -7,12 +7,15 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, List
 import logging
 from pathlib import Path
 import json
 from tqdm import tqdm
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # Non-interactive backend
+import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +30,8 @@ class SupervisedTrainer:
                  optimizer: optim.Optimizer,
                  device: torch.device,
                  checkpoint_dir: str = 'outputs/checkpoints',
-                 log_dir: str = 'outputs/logs'):
+                 log_dir: str = 'outputs/logs',
+                 scheduler: Optional[optim.lr_scheduler._LRScheduler] = None):
         """Initialize supervised trainer.
         
         Args:
@@ -38,11 +42,13 @@ class SupervisedTrainer:
             device: Device to train on
             checkpoint_dir: Directory to save checkpoints
             log_dir: Directory to save logs
+            scheduler: Optional learning rate scheduler
         """
         self.model = model.to(device)
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.optimizer = optimizer
+        self.scheduler = scheduler
         self.device = device
         
         self.checkpoint_dir = Path(checkpoint_dir)
@@ -51,10 +57,15 @@ class SupervisedTrainer:
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
         
+        self.plot_dir = self.log_dir / 'plots'
+        self.plot_dir.mkdir(parents=True, exist_ok=True)
+        
         self.best_val_loss = float('inf')
         self.best_val_acc = 0.0
         self.train_history = []
         self.val_history = []
+        self.lr_history = []
+        self.start_epoch = 1
     
     def train_epoch(self, epoch: int) -> Dict[str, float]:
         """Train for one epoch.
@@ -196,18 +207,23 @@ class SupervisedTrainer:
         
         return discard_loss
     
-    def train(self, num_epochs: int, scheduler: Optional[optim.lr_scheduler._LRScheduler] = None):
+    def train(self, num_epochs: int, save_every: int = 10):
         """Train the model for multiple epochs.
         
         Args:
             num_epochs: Number of epochs to train
-            scheduler: Optional learning rate scheduler
+            save_every: Save checkpoint every N epochs
         """
         logger.info(f"Starting training for {num_epochs} epochs")
+        logger.info(f"Starting from epoch {self.start_epoch}")
         logger.info(f"Training samples: {len(self.train_loader.dataset)}")
         logger.info(f"Validation samples: {len(self.val_loader.dataset)}")
         
-        for epoch in range(1, num_epochs + 1):
+        for epoch in range(self.start_epoch, num_epochs + 1):
+            # Get current learning rate
+            current_lr = self.optimizer.param_groups[0]['lr']
+            self.lr_history.append(current_lr)
+            
             # Train
             train_metrics = self.train_epoch(epoch)
             self.train_history.append(train_metrics)
@@ -222,40 +238,47 @@ class SupervisedTrainer:
                 f"Train Loss: {train_metrics['loss']:.4f}, "
                 f"Train Acc: {train_metrics['accuracy']:.4f}, "
                 f"Val Loss: {val_metrics['loss']:.4f}, "
-                f"Val Acc: {val_metrics['accuracy']:.4f}"
+                f"Val Acc: {val_metrics['accuracy']:.4f}, "
+                f"LR: {current_lr:.6f}"
             )
             
             # Learning rate scheduling
-            if scheduler is not None:
-                if isinstance(scheduler, optim.lr_scheduler.ReduceLROnPlateau):
-                    scheduler.step(val_metrics['loss'])
+            if self.scheduler is not None:
+                if isinstance(self.scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+                    self.scheduler.step(val_metrics['loss'])
                 else:
-                    scheduler.step()
-                
-                current_lr = self.optimizer.param_groups[0]['lr']
-                logger.info(f"Learning rate: {current_lr:.6f}")
+                    self.scheduler.step()
+            
+            # Plot training curves
+            self.plot_training_curves(epoch)
             
             # Save checkpoint if best
             if val_metrics['accuracy'] > self.best_val_acc:
                 self.best_val_acc = val_metrics['accuracy']
                 self.save_checkpoint(epoch, 'best_acc')
-                logger.info(f"Saved best accuracy checkpoint: {val_metrics['accuracy']:.4f}")
+                logger.info(f"✅ Saved best accuracy checkpoint: {val_metrics['accuracy']:.4f}")
             
             if val_metrics['loss'] < self.best_val_loss:
                 self.best_val_loss = val_metrics['loss']
                 self.save_checkpoint(epoch, 'best_loss')
-                logger.info(f"Saved best loss checkpoint: {val_metrics['loss']:.4f}")
+                logger.info(f"✅ Saved best loss checkpoint: {val_metrics['loss']:.4f}")
             
             # Save periodic checkpoint
-            if epoch % 10 == 0:
-                self.save_checkpoint(epoch, f'epoch_{epoch}')
+            if epoch % save_every == 0:
+                self.save_checkpoint(epoch, f'checkpoint_epoch_{epoch}')
+                logger.info(f"💾 Saved checkpoint at epoch {epoch}")
+            
+            # Always save latest checkpoint (for resuming)
+            self.save_checkpoint(epoch, 'latest')
         
-        # Save training history
+        # Save final training history
         self.save_history()
         
+        logger.info("=" * 80)
         logger.info("Training completed!")
         logger.info(f"Best validation accuracy: {self.best_val_acc:.4f}")
         logger.info(f"Best validation loss: {self.best_val_loss:.4f}")
+        logger.info("=" * 80)
     
     def save_checkpoint(self, epoch: int, name: str):
         """Save model checkpoint.
@@ -268,38 +291,58 @@ class SupervisedTrainer:
             'epoch': epoch,
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
+            'scheduler_state_dict': self.scheduler.state_dict() if self.scheduler else None,
             'best_val_loss': self.best_val_loss,
             'best_val_acc': self.best_val_acc,
             'train_history': self.train_history,
-            'val_history': self.val_history
+            'val_history': self.val_history,
+            'lr_history': self.lr_history
         }
         
         checkpoint_path = self.checkpoint_dir / f'{name}.pth'
         torch.save(checkpoint, checkpoint_path)
     
-    def load_checkpoint(self, checkpoint_path: str):
+    def load_checkpoint(self, checkpoint_path: str) -> int:
         """Load model checkpoint.
         
         Args:
             checkpoint_path: Path to checkpoint file
+            
+        Returns:
+            Epoch number to resume from
         """
+        logger.info(f"Loading checkpoint from {checkpoint_path}")
         checkpoint = torch.load(checkpoint_path, map_location=self.device)
         
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        
+        # Load scheduler state if available
+        if self.scheduler and checkpoint.get('scheduler_state_dict'):
+            self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        
         self.best_val_loss = checkpoint.get('best_val_loss', float('inf'))
         self.best_val_acc = checkpoint.get('best_val_acc', 0.0)
         self.train_history = checkpoint.get('train_history', [])
         self.val_history = checkpoint.get('val_history', [])
+        self.lr_history = checkpoint.get('lr_history', [])
+        self.start_epoch = checkpoint['epoch'] + 1
         
-        logger.info(f"Loaded checkpoint from {checkpoint_path}")
-        logger.info(f"Resuming from epoch {checkpoint['epoch']}")
+        logger.info(f"✅ Loaded checkpoint from epoch {checkpoint['epoch']}")
+        logger.info(f"   Best val acc: {self.best_val_acc:.4f}")
+        logger.info(f"   Best val loss: {self.best_val_loss:.4f}")
+        logger.info(f"   Resuming from epoch {self.start_epoch}")
+        
+        return self.start_epoch
     
     def save_history(self):
         """Save training history to JSON."""
         history = {
             'train': self.train_history,
-            'val': self.val_history
+            'val': self.val_history,
+            'learning_rate': self.lr_history,
+            'best_val_acc': self.best_val_acc,
+            'best_val_loss': self.best_val_loss
         }
         
         history_path = self.log_dir / 'training_history.json'
@@ -307,6 +350,90 @@ class SupervisedTrainer:
             json.dump(history, f, indent=2)
         
         logger.info(f"Saved training history to {history_path}")
+    
+    def plot_training_curves(self, epoch: int):
+        """Plot and save training curves.
+        
+        Args:
+            epoch: Current epoch number
+        """
+        if not self.train_history or not self.val_history:
+            return
+        
+        epochs = list(range(1, len(self.train_history) + 1))
+        train_losses = [h['loss'] for h in self.train_history]
+        train_accs = [h['accuracy'] for h in self.train_history]
+        val_losses = [h['loss'] for h in self.val_history]
+        val_accs = [h['accuracy'] for h in self.val_history]
+        
+        # Create figure with 3 subplots
+        fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+        
+        # Plot 1: Loss
+        axes[0].plot(epochs, train_losses, 'b-', label='Train Loss', linewidth=2)
+        axes[0].plot(epochs, val_losses, 'r-', label='Val Loss', linewidth=2)
+        axes[0].set_xlabel('Epoch', fontsize=12)
+        axes[0].set_ylabel('Loss', fontsize=12)
+        axes[0].set_title('Training and Validation Loss', fontsize=14, fontweight='bold')
+        axes[0].legend(fontsize=11)
+        axes[0].grid(True, alpha=0.3)
+        
+        # Plot 2: Accuracy
+        axes[1].plot(epochs, train_accs, 'b-', label='Train Acc', linewidth=2)
+        axes[1].plot(epochs, val_accs, 'r-', label='Val Acc', linewidth=2)
+        axes[1].set_xlabel('Epoch', fontsize=12)
+        axes[1].set_ylabel('Accuracy', fontsize=12)
+        axes[1].set_title('Training and Validation Accuracy', fontsize=14, fontweight='bold')
+        axes[1].legend(fontsize=11)
+        axes[1].grid(True, alpha=0.3)
+        
+        # Plot 3: Learning Rate
+        if self.lr_history:
+            axes[2].plot(range(1, len(self.lr_history) + 1), self.lr_history, 'g-', linewidth=2)
+            axes[2].set_xlabel('Epoch', fontsize=12)
+            axes[2].set_ylabel('Learning Rate', fontsize=12)
+            axes[2].set_title('Learning Rate Schedule', fontsize=14, fontweight='bold')
+            axes[2].set_yscale('log')
+            axes[2].grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        
+        # Save figure
+        plot_path = self.plot_dir / f'training_curves_epoch_{epoch:04d}.png'
+        plt.savefig(plot_path, dpi=100, bbox_inches='tight')
+        plt.close()
+        
+        # Also save as latest
+        latest_path = self.plot_dir / 'training_curves_latest.png'
+        fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+        
+        axes[0].plot(epochs, train_losses, 'b-', label='Train Loss', linewidth=2)
+        axes[0].plot(epochs, val_losses, 'r-', label='Val Loss', linewidth=2)
+        axes[0].set_xlabel('Epoch', fontsize=12)
+        axes[0].set_ylabel('Loss', fontsize=12)
+        axes[0].set_title('Training and Validation Loss', fontsize=14, fontweight='bold')
+        axes[0].legend(fontsize=11)
+        axes[0].grid(True, alpha=0.3)
+        
+        axes[1].plot(epochs, train_accs, 'b-', label='Train Acc', linewidth=2)
+        axes[1].plot(epochs, val_accs, 'r-', label='Val Acc', linewidth=2)
+        axes[1].set_xlabel('Epoch', fontsize=12)
+        axes[1].set_ylabel('Accuracy', fontsize=12)
+        axes[1].set_title('Training and Validation Accuracy', fontsize=14, fontweight='bold')
+        axes[1].legend(fontsize=11)
+        axes[1].grid(True, alpha=0.3)
+        
+        if self.lr_history:
+            axes[2].plot(range(1, len(self.lr_history) + 1), self.lr_history, 'g-', linewidth=2)
+            axes[2].set_xlabel('Epoch', fontsize=12)
+            axes[2].set_ylabel('Learning Rate', fontsize=12)
+            axes[2].set_title('Learning Rate Schedule', fontsize=14, fontweight='bold')
+            axes[2].set_yscale('log')
+            axes[2].grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(latest_path, dpi=100, bbox_inches='tight')
+        plt.close()
 
 
 def create_optimizer(model: nn.Module, 
