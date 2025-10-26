@@ -53,3 +53,4 @@ def get_device(use_cuda: bool = True, device_id: int = 0) -> torch.device:
     
     return device
 
+

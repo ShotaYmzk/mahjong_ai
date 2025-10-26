@@ -383,3 +383,4 @@ class SimplifiedMahjongTransformer(nn.Module):
         
         return features, attention_weights
 
+

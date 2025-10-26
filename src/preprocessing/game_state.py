@@ -280,3 +280,4 @@ class GameStateManager:
         """全局の履歴を取得"""
         return self.round_history
 
+

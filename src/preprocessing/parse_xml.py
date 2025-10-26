@@ -85,37 +85,81 @@ class TenhouXMLParser:
     def decode_meld(meld_code: int) -> MeldInfo:
         """Decode meld information from Tenhou's m attribute.
         
+        This implements the correct Tenhou meld decoding based on:
+        - https://gimite.net/pukiwiki/index.php?Tenhou%20Log%20Format
+        - Analysis of ver_3.0.0/naki_utils.py
+        
         Args:
             meld_code: Integer meld code from XML
             
         Returns:
-            MeldInfo object
+            MeldInfo object with correctly decoded tiles
         """
-        # This is a simplified version - full decoding is complex
-        # Reference: http://tenhou.net/img/tehai.js
+        from_who = meld_code & 3
         
-        if meld_code & 0x4:
-            # Chi (sequence)
+        # Chi (sequence) - bit 2 is set
+        if meld_code & (1 << 2):
             meld_type = 'chi'
-            t0 = (meld_code >> 3) & 0x3
-            t1 = (meld_code >> 5) & 0x3
-            t2 = (meld_code >> 7) & 0x3
-            base_tile = (meld_code >> 10) & 0x7f
-            tiles = [base_tile + t0, base_tile + t1, base_tile + t2]
-            from_who = meld_code & 0x3
-        elif meld_code & 0x18:
-            # Pon (triplet)
+            t = meld_code >> 10
+            r = t % 3  # Which tile was called (0-2)
+            t //= 3
+            
+            # Determine base tile index (0-33 system)
+            if 0 <= t <= 6:
+                base_index = t  # 1m-7m
+            elif 7 <= t <= 13:
+                base_index = (t - 7) + 9  # 1p-7p
+            elif 14 <= t <= 20:
+                base_index = (t - 14) + 18  # 1s-7s
+            else:
+                # Invalid - fallback
+                base_index = 0
+            
+            # Get the three tile IDs in the sequence
+            offsets = [(meld_code >> 3) & 3, (meld_code >> 5) & 3, (meld_code >> 7) & 3]
+            tiles = []
+            for i in range(3):
+                tile_kind = base_index + i
+                tile_id = tile_kind * 4 + offsets[i]
+                tiles.append(tile_id)
+        
+        # Pon (triplet) - bit 3 is set
+        elif meld_code & (1 << 3):
             meld_type = 'pon'
-            base_tile = (meld_code >> 9) & 0x7f
-            unused = (meld_code >> 5) & 0x3
-            tiles = [base_tile + i for i in range(3) if i != unused]
-            from_who = meld_code & 0x3
+            t = meld_code >> 9
+            t //= 3
+            
+            base_id = t * 4
+            unused_offset = (meld_code >> 5) & 3
+            
+            # Select 3 out of 4 tiles (excluding unused)
+            tiles = []
+            for i in range(4):
+                if i != unused_offset:
+                    tiles.append(base_id + i)
+        
+        # Kakan (added kan) - bit 4 is set
+        elif meld_code & (1 << 4):
+            meld_type = 'kan'  # Could distinguish as 'kakan' if needed
+            t = meld_code >> 9
+            t //= 3
+            
+            base_id = t * 4
+            tiles = [base_id, base_id + 1, base_id + 2, base_id + 3]
+            from_who = -1  # Self
+        
+        # Ankan or Daiminkan
         else:
-            # Kan (quad)
             meld_type = 'kan'
-            base_tile = (meld_code >> 8) & 0x7f
-            tiles = [base_tile + i for i in range(4)]
-            from_who = meld_code & 0x3
+            tile_id_raw = meld_code >> 8
+            tile_index = tile_id_raw // 4
+            
+            base_id = tile_index * 4
+            tiles = [base_id, base_id + 1, base_id + 2, base_id + 3]
+            
+            # If from_who is 3, it's ankan (concealed kan)
+            if from_who == 3:
+                from_who = -1  # Self
         
         return MeldInfo(meld_type=meld_type, tiles=tiles, from_who=from_who)
     

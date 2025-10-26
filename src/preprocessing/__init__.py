@@ -4,6 +4,7 @@ from .parse_xml import TenhouXMLParser
 from .feature_encoder import TileEncoder, AdvancedFeatureExtractor
 from .dataset_builder import MahjongDatasetBuilder, SequenceDatasetBuilder
 from .game_state import RoundGameState, DiscardHistory, GameStateManager
+from .advanced_game_state import AdvancedGameState
 
 __all__ = [
     "TenhouXMLParser", 
@@ -13,6 +14,7 @@ __all__ = [
     "SequenceDatasetBuilder",
     "RoundGameState",
     "DiscardHistory",
-    "GameStateManager"
+    "GameStateManager",
+    "AdvancedGameState"
 ]
 

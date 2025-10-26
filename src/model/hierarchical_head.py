@@ -381,3 +381,4 @@ class CompleteMahjongModel(nn.Module):
         features, _ = self.backbone(x, mask)
         return features
 
+

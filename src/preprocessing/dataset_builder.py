@@ -462,3 +462,4 @@ class SequenceDatasetBuilder:
             'feature_dim': X.shape[2]
         }
 
+

@@ -325,3 +325,4 @@ def print_hand_analysis(analysis: Dict):
         
         print(f"打{discard_str} ({shanten_display}) 摸[{ukeire_str} {total_枚数}枚]")
 
+

@@ -65,3 +65,4 @@ def get_logger(name: str = 'mahjong_ai') -> logging.Logger:
     """
     return logging.getLogger(name)
 
+
