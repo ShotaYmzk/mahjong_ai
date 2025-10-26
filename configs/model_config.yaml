@@ -1,0 +1,86 @@
+# Model Architecture Configuration
+
+# Input dimensions
+input:
+  input_dim: 340  # 34 tile types * 10 feature groups
+  num_tile_types: 34
+  num_tile_groups: 10
+  tile_group_size: 34
+
+# Transformer-in-Transformer (TIT) architecture
+# Target: ~15M parameters for GPU efficiency
+tit:
+  d_model: 448  # Hidden dimension (tuned for ~15M params)
+  nhead_inner: 8  # Number of heads in inner transformer
+  nhead_outer: 8  # Number of heads in outer transformer
+  num_inner_layers: 3  # Number of inner transformer layers
+  num_outer_layers: 3  # Number of outer transformer layers
+  dim_feedforward: 1792  # Feedforward network dimension (4 * d_model)
+  dropout: 0.1
+  activation: "relu"
+
+# Simplified Transformer (alternative architecture)
+simplified_transformer:
+  d_model: 512
+  nhead: 8
+  num_layers: 6
+  dim_feedforward: 2048
+  dropout: 0.1
+  activation: "relu"
+  max_seq_len: 512
+
+# Discard history settings
+discard_history:
+  max_history_length: 64  # 局の初めから全打牌を保持
+  use_player_embedding: true  # どのプレイヤーの打牌かを区別
+  use_temporal_encoding: true  # 時系列情報を含める
+
+# Hierarchical Head configuration
+hierarchical_head:
+  use_hierarchical: true  # Set to false for simplified discard-only head
+  num_actions: 7  # discard, chi, pon, kan, riichi, tsumo, ron
+  num_claim_types: 3  # chi, pon, kan
+  num_tiles: 34
+  dropout: 0.1
+
+# Simplified Discard-Only Head
+discard_head:
+  hidden_dims: [256, 128]
+  num_tiles: 34
+  dropout: 0.1
+
+# Positional encoding
+positional_encoding:
+  max_len: 512
+  dropout: 0.1
+
+# Layer normalization
+layer_norm:
+  eps: 1e-6
+
+# Initialization
+initialization:
+  method: "xavier_uniform"  # Options: "xavier_uniform", "xavier_normal", "kaiming_uniform", "kaiming_normal"
+  gain: 1.0
+
+# Model size variants
+# Uncomment to use a smaller or larger model
+
+# Small model (faster, less accurate)
+# tit:
+#   d_model: 128
+#   nhead_inner: 2
+#   nhead_outer: 4
+#   num_inner_layers: 1
+#   num_outer_layers: 2
+#   dim_feedforward: 512
+
+# Large model (slower, more accurate)
+# tit:
+#   d_model: 512
+#   nhead_inner: 8
+#   nhead_outer: 16
+#   num_inner_layers: 3
+#   num_outer_layers: 6
+#   dim_feedforward: 2048
+

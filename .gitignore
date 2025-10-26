@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# PyCharm
+.idea/
+
+# VSCode
+.vscode/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# Data files
+data/raw/*.xml
+data/processed/*.npy
+data/processed/*.npz
+data/split/*.npy
+*.xml
+!2009080100gm-00e1-0000-63d644dd.xml  # Keep test file
+
+# Model checkpoints
+outputs/checkpoints/*.pth
+outputs/logs/*.log
+outputs/logs/*.json
+
+# Large files
+*.hdf5
+*.h5
+*.pkl
+*.pickle
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Temporary files
+*.tmp
+*.bak
+*.orig
+QUICK_START_SUPERVISED.txt
+
